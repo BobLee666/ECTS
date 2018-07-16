@@ -85,7 +85,6 @@ Q=1;         %%increasement of the pheromones?
 
 %%step 1 initialization?
 Tau=ones(N);     %Tau pheromones matrix 
-Tabu=zeros(m,N);   %store the route
 NC=1;               %iteration counter
 R_best=zeros(NC_max,N);       %best route at each iteration
 L_best=inf.*ones(NC_max,1);   %best fitness at each iteration
@@ -95,47 +94,29 @@ L_ave=zeros(NC_max,1);        %average fitness at each iteration?
 while NC<=NC_max        %stop when reach the iteration times­¢
 	%%step 2 put m ants on different varaiables,each variable is a combine
 	%%the cities
-	Randpos = round(rand(m,N));
-	Tabu(:,1) = Randpos(:,1);
-	Choice = Randpos;
+	Choice = ones(m,N);
 	%%step 3 mth ant choose next city by possibility
     for j=1:n     
         for i=1:m
-            visited=Tabu(i,1:(j-1)); %record the visited cities ?
-            J=zeros(1,(n-j+1));       %the unvisited city 
-            P=J;                      %init the posibility of the unvisited city
-            Jc=1;
-            for k=1:n
-                if isempty(find(visited==k,1))   %add the unvisited cities
-                    J(Jc)=k;
-                    Jc=Jc+1;                         
-                end
-            end
             %calculate the posibility of the unvisited city?
-            for k=1:length(J)
-				pop(1,:) = Choice(i,:);
-				pop(2,:) = Choice(i,:);
-				pop(2,J(k)) = ~Choice(i,J(k));
-				Eta = nij(pop(2,:),Fl,betaT,betaE,L0,v,theta,N,tpro,C,f0,D,B,W,R,rou,p) ...
-				-nij(pop(1,:),Fl,betaT,betaE,L0,v,theta,N,tpro,C,f0,D,B,W,R,rou,p);
-				if Eta < 0
-					Eta = 0;
-				end
-                P(k)=(Tau(J(k)))^Alpha)*(Eta^Beta); %Eta is the diff between the two schedule?
+            for k=1:2       %1 represent the local ,2 represent the cloud
+                P(k)=(Tau(J(k)))^Alpha); 
             end
             P=P/(sum(P));
             %choose the next city based on possibility
             Pcum=cumsum(P);     
             Select=find(Pcum>=rand); 
-            to_visit=J(Select(1));
-            Tabu(i,j)=to_visit;
-			Choice(i,J(Select(1))) = ~Choice(i,J(Select(1)));
+			if Select(1) == 1
+				Choice(i,j) = 0;
+			else
+				Choice(i,j) = 1;
+			end
         end
     end
     %%step 4 record the best?
     L=zeros(m,1);     %init the fitness at this iteration
     for i=1:m
-        L(i) = nij(Choice(i,:),Fl,betaT,betaE,L0,v,theta,N,tpro,C,f0,D,B,W,R,rou,p);      ¦»
+        L(i) = calcufit(Choice(i,:),Fl,betaT,betaE,L0,v,theta,N,tpro,C,f0,D,B,W,R,rou,p);      ¦»
     end
     L_best(NC)=max(L);           %choose the best fitness
     pos=find(L==L_best(NC));
@@ -148,7 +129,7 @@ while NC<=NC_max        %stop when reach the iteration times­¢
     Delta_Tau=zeros(N);        %init the delta pheromones matrix
     for i=1:m
         for j=1:N
-            Delta_Tau(j)=Delta_Tau(j)+Q*Choice(i,j);
+            Delta_Tau(j)=Delta_Tau(j)+Q*L(i)/N;
         end
     end
     Tau=(1-Rho).*Tau+Delta_Tau; %consider the decrease of the pheromones?
@@ -161,7 +142,7 @@ Pos=find(L_best==max(L_best)); %best route?
 Best_Schedule=R_best(Pos(1),:); %best schedule?
 Biggest_Length=L_best(Pos(1)); %best fitness
 
-function res = nij(location,Fl,betaT,betaE,L0,v,theta,N,tpro,C,f0,D,B,W,R,rou,p)
+function res = calcufit(location,Fl,betaT,betaE,L0,v,theta,N,tpro,C,f0,D,B,W,R,rou,p)
     Tl = C./Fl;
     El = 1e-20*Fl*C;
     tao = rou*betaT;
