@@ -96,6 +96,84 @@ Pos=find(L_best==max(L_best)); %best route?
 Best_Schedule=R_best(Pos(1),:); %best schedule?
 Biggest_Length=L_best(Pos(1)); %best fitness
 
+% enumerate
+for i = 1:2^N
+    bi = dec2bin(i-1);
+    st = num2str(bi);
+    for j = 1:length(st)
+        meis(i,j) = (st(length(st)-j+1)=='1');
+    end
+end
+% save the optional solution
+enuFinalLocation = zeros(N,1); 
+enuFinalUserUti = zeros(N,1);
+enuFinalSysUti = 0;
+[finalE,finalT] = deal(zeros(N,1));
+fiSleave = [];
+
+
+for i = 1:2^N
+    location = meis(i,:);
+    Sleave = [];
+    if sum(location==1)>B/W
+        continue;
+    end
+    %translate location to schedule
+    meiS = find(location==1);
+    % calculate fi according to schedule
+    su = 0; 
+    for j=1:length(meiS)
+        su = su + sqrt(tao(meiS(j))*Fl(meiS(j)));
+    end
+    for j=1:length(meiS)
+        k = meiS(j);
+        fi(k) = sqrt(tao(k)*Fl(k))*f0/su;
+    end
+    %caculate the transtime 
+    for i=1:N
+        Ttrans(i) = transtime(L0(i),v(i),theta(i),tpro,D,W,p(i));
+    end
+    %caculate the user who finally leaves the cover
+    for j=1:length(meiS)
+        k = meiS(j);
+        Ttol(k) = tpro + Ttrans(k) +  C/fi(k);
+        Lf(k) = sqrt(L0(k)^2+(v(k)*Ttol(k))^2-2*L0(k)*v(k)*Ttol(k)*cosd(theta(k)));
+        if Lf(k)>R
+            Sleave(length(Sleave)+1)=k;
+        end
+    end 
+    %calculate the result
+    meiUserUti = zeros(N,1);
+    meiSysUti = 0;
+    for j=1:N
+        if(location(j)==0)
+            meiUserUti(j) = 0;
+        else
+            meiUserUti(j) =  betaT(j)*(Tl(j)-Ttrans(j)-C/fi(j))/Tl(j)...
+                    + betaE(j)*(El(j)-p(j)*Ttrans(j))/El(j);
+            %punish those who leave 
+            Ttol(j) = tpro + Ttrans(j) +  C/fi(j);
+            Lf(j) = sqrt(L0(j)^2+(v(j)*Ttol(j))^2-2*L0(j)*v(j)*Ttol(j)*cosd(theta(j)));
+            if Lf(j)>R
+                meiUserUti(j) = meiUserUti(j) - 0.00002*Lf(j)^2;
+            end
+			if(meiUserUti(j)<0)
+				location(j)=0;
+				meiUserUti(j) = 0;
+			end
+        end
+        meiSysUti = meiSysUti + meiUserUti(j);
+    end
+    
+    %compare with the temp optimal
+    if meiSysUti > enuFinalSysUti
+        enuFinalLocation = location; 
+        enuFinalUserUti = meiUserUti;
+        enuFinalSysUti = meiSysUti;     
+        fiSleave =Sleave;
+    end
+end
+
 function res = calcufit(location,Fl,betaT,betaE,L0,v,theta,N,tpro,C,f0,D,B,W,R,rou,p)
     Tl = C./Fl;
     El = 1e-20*Fl*C;

@@ -121,7 +121,7 @@ while NC<=NC_max        %stop when reach the iteration times­¢
 				if Eta < 0
 					Eta = 0;
 				end
-                P(k)=(Tau(J(k)))^Alpha)*(Eta^Beta); %Eta is the diff between the two schedule?
+                P(k)=(Tau(J(k)))^Alpha*(Eta^Beta); %Eta is the diff between the two schedule?
             end
             P=P/(sum(P));
             %choose the next city based on possibility
