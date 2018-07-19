@@ -1,6 +1,6 @@
 clear;
 clc;
-N = 3;
+N = 10;
 R = 100;
 
 
@@ -27,11 +27,11 @@ El = 1e-20*Fl*C;
 tao = rou*betaT;
 
 
-m=1;    %% ant number
+m=5;    %% ant number
 Alpha=1;  %% Alpha importance of pheromones
 Beta=5;  %% Beta importance of Heuristic factor
 Rho=0.1; %% Rho decrease factor of pheromones
-NC_max=2; %% max iteration times
+NC_max=200; %% max iteration times
 Q=1;         %%increasement of the pheromones?
 
 
@@ -43,7 +43,7 @@ L_best=inf.*ones(NC_max,1);   %best fitness at each iteration
 L_ave=zeros(NC_max,1);        %average fitness at each iteration?
 
 
-while NC<=NC_max        %stop when reach the iteration times­¢
+while NC<=NC_max        %stop when reach the iteration times??
 	%%step 2 put m ants on different varaiables,each variable is a combine
 	%%the cities
 	Choice = ones(m,N);
@@ -120,33 +120,28 @@ for i = 1:2^N
     end
     %translate location to schedule
     meiS = find(location==1);
-	%caculate the transtime 
+    % calculate fi according to schedule
+    su = 0; 
+    for j=1:length(meiS)
+        su = su + sqrt(tao(meiS(j))*Fl(meiS(j)));
+    end
+    for j=1:length(meiS)
+        k = meiS(j);
+        fi(k) = sqrt(tao(k)*Fl(k))*f0/su;
+    end
+    %caculate the transtime 
     for i=1:N
         Ttrans(i) = transtime(L0(i),v(i),theta(i),tpro,D,W,p(i));
     end
-	
-    % calculate fi according to schedule
-	An = zeros(N,1);
-	Bn = zeros(N,1);
-
-	for j=1:length(meiS)
-		t = meiS(j);
-		An(t) = (rou*betaT(t)*C/Tl(t)) + 2*(tpro+Ttrans(t))*C;
-		Bn(t) = C^2;
-	end
-	lam = callambda(meiS,An,Bn,f0);
-	for j=1:length(meiS)
-		t = meiS(j);
-		strA = num2str(An(t));
-		strB = num2str(Bn(t));
-		stra = num2str(-lam(t));
-		equal = strcat([stra,'+',strA,'/(x^2)+2*',strB,'/(x^3)=0']);
-		x = solve(equal,'x');
-
-		y = x(3);
-		fi(t) = double(y);
-	end
-	
+    %caculate the user who finally leaves the cover
+    for j=1:length(meiS)
+        k = meiS(j);
+        Ttol(k) = tpro + Ttrans(k) +  C/fi(k);
+        Lf(k) = sqrt(L0(k)^2+(v(k)*Ttol(k))^2-2*L0(k)*v(k)*Ttol(k)*cosd(theta(k)));
+        if Lf(k)>R
+            Sleave(length(Sleave)+1)=k;
+        end
+    end 
     %calculate the result
     meiUserUti = zeros(N,1);
     meiSysUti = 0;
@@ -156,16 +151,12 @@ for i = 1:2^N
         else
             meiUserUti(j) =  betaT(j)*(Tl(j)-Ttrans(j)-C/fi(j))/Tl(j)...
                     + betaE(j)*(El(j)-p(j)*Ttrans(j))/El(j);
-			%consider the punishment 
-			Ttol(j) = tpro + Ttrans(j) +  C/fi(j);
-			if(theta(j) > 90)
-				TR(j) = (R - L0(j))/(v(j)*cosd(180 - theta(j)));
-			elseif(theta(j) < 90)
-				TR(j) = (R + L0(j))/(v(j)*cosd(theta(j)));
-			else
-				TR(j) = sqrt(R^2 - L0(j)^2)/v(j);
-			end
-			meiUserUti(j) = meiUserUti(j) - (Ttol(j))^2 + TR(j)^2;
+            %punish those who leave 
+            Ttol(j) = tpro + Ttrans(j) +  C/fi(j);
+            Lf(j) = sqrt(L0(j)^2+(v(j)*Ttol(j))^2-2*L0(j)*v(j)*Ttol(j)*cosd(theta(j)));
+            if Lf(j)>R
+                meiUserUti(j) = meiUserUti(j) - 0.00002*Lf(j)^2;
+            end
 			if(meiUserUti(j)<0)
 				location(j)=0;
 				meiUserUti(j) = 0;
@@ -200,25 +191,15 @@ function res = calcufit(location,Fl,betaT,betaE,L0,v,theta,N,tpro,C,f0,D,B,W,R,r
 	%translate location to schedule
 	S = find(location==1);
 	% calculate fi according to schedule
-	An = zeros(N,1);
-	Bn = zeros(N,1);
-
-	for j=1:length(S)
-		t = S(j);
-		An(t) = (rou*betaT(t)*C/Tl(t)) + 2*(tpro+Ttrans(t))*C;
-		Bn(t) = C^2;
-	end
-	lam = callambda(S,An,Bn,f0);
-	for j=1:length(S)
-		t = S(j);
-		strA = num2str(An(t));
-		strB = num2str(Bn(t));
-		stra = num2str(-lam(t));
-		equal = strcat([stra,'+',strA,'/(x^2)+2*',strB,'/(x^3)=0']);
-		x = solve(equal,'x');
-
-		y = x(3);
-		fi(t) = double(y);
+	su = 0; 
+	if ~isempty(S)
+		for j=1:length(S)
+			su = su + sqrt(tao(S(j))*Fl(S(j)));
+		end
+		for j=1:length(S)
+			k = S(j);
+			fi(k) = sqrt(tao(k)*Fl(k))*f0/su;
+		end
 	end
 	
 	%calculate the result
@@ -231,17 +212,12 @@ function res = calcufit(location,Fl,betaT,betaE,L0,v,theta,N,tpro,C,f0,D,B,W,R,r
 		else
 			UserUti(j) =  betaT(j)*(Tl(j)-Ttrans(j)-C/fi(j))/Tl(j)...
 				+ betaE(j)*(El(j)-p(j)*Ttrans(j))/El(j);
-			%consider the punishment 
+			%punish those who leave 
 			Ttol(j) = tpro + Ttrans(j) +  C/fi(j);
-			if(theta(j) > 90)
-				TR(j) = (R - L0(j))/(v(j)*cosd(180 - theta(j)));
-			elseif(theta(j) < 90)
-				TR(j) = (R + L0(j))/(v(j)*cosd(theta(j)));
-			else
-				TR(j) = sqrt(R^2 - L0(j)^2)/v(j);
+			Lf(j) = sqrt(L0(j)^2+(v(j)*Ttol(j))^2-2*L0(j)*v(j)*Ttol(j)*cosd(theta(j)));
+			if Lf(j)>R
+				UserUti(j) = UserUti(j) - 0.00002*Lf(j)^2;
 			end
-			UserUti(j) = UserUti(j) - (Ttol(j))^2 + TR(j)^2;
-
 			if(UserUti(j)<0)
 				location(j)=0;
 				UserUti(j) = 0;

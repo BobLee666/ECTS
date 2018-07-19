@@ -113,17 +113,26 @@ function res = calcufit(location,Fl,betaT,betaE,L0,v,theta,N,tpro,C,f0,D,B,W,R,r
 	%translate location to schedule
 	S = find(location==1);
 	% calculate fi according to schedule
-	su = 0; 
-	if ~isempty(S)
-		for j=1:length(S)
-			su = su + sqrt(tao(S(j))*Fl(S(j)));
-		end
-		for j=1:length(S)
-			k = S(j);
-			fi(k) = sqrt(tao(k)*Fl(k))*f0/su;
-		end
+	An = zeros(N,1);
+	Bn = zeros(N,1);
+
+	for j=1:length(S)
+		t = S(j);
+		An(t) = (rou*betaT(t)*C/Tl(t)) + 2*(tpro+Ttrans(t))*C;
+		Bn(t) = C^2;
 	end
-	
+	lam = callambda(S,An,Bn,f0);
+	for j=1:length(S)
+		t = meiS(j);
+		strA = num2str(An(t));
+		strB = num2str(Bn(t));
+		stra = num2str(-lam(t));
+		equal = strcat([stra,'+',strA,'/(x^2)+2*',strB,'/(x^3)=0']);
+		x = solve(equal,'x');
+
+		y = x(3);
+		fi(t) = double(y);
+	end	
 	%calculate the result
 	UserUti = zeros(N,1);
 	SysUti = 0;
